@@ -21,7 +21,6 @@ from hyperspy.signals import Signal2D, BaseSignal, Signal1D
 from collections import OrderedDict
 from hyperspy.misc.holography.reconstruct import reconstruct, estimate_sideband_position, estimate_sideband_size
 import logging
-import warnings
 import scipy.constants as constants
 
 _logger = logging.getLogger(__name__)
