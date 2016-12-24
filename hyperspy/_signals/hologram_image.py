@@ -133,7 +133,7 @@ class HologramImage(Signal2D):
         Signal 1D instance with sideband size, referred to the unshifted FFT.
         """
 
-        sb_size = sb_position.map(estimate_sideband_size, holo_shape=self.axes_manager.signal_shape,
+        sb_size = sb_position.map(estimate_sideband_size, holo_shape=self.axes_manager.signal_shape[::-1],
                                   show_progressbar=show_progressbar, inplace=False)
 
         return sb_size
@@ -141,8 +141,8 @@ class HologramImage(Signal2D):
     def reconstruct_phase(self, reference=None, sb_size=None, sb_smoothness=None, sb_unit=None,
                           sb='lower', sb_position=None, output_shape=None, plotting=False, show_progressbar=False,
                           store_parameters=True):
-        """Reconstruct electron holograms. Operates on multidimensional hyperspy signals. There are several usage
-        schemes:
+        """Reconstruct electron holograms. Operates on multidimensional hyperspy signals. There are
+        several usage schemes:
          1. Reconstruct 1d or Nd hologram without reference
          2. Reconstruct 1d or Nd hologram using single reference hologram
          3. Reconstruct Nd hologram using Nd reference hologram (applies each reference to each hologram in Nd stack)
@@ -157,7 +157,7 @@ class HologramImage(Signal2D):
         sb_size : float, ndarray, :class:`~hyperspy.signals.BaseSignal, None
             Sideband radius of the aperture in corresponding unit (see 'sb_unit'). If None,
             the radius of the aperture is set to 1/3 of the distance between sideband and
-            centreband.
+            center band.
         sb_smoothness : float, ndarray, :class:`~hyperspy.signals.BaseSignal, None
             Smoothness of the aperture in the same unit as sb_size.
         sb_unit : str, None
@@ -191,7 +191,6 @@ class HologramImage(Signal2D):
         """
 
         # TODO: Use defaults for choosing sideband, smoothness, relative filter size and output shape if not provided
-        # TODO: Design a way to store reconstruction parameters ready for quick inspection
         # TODO: Plot FFT with marked SB and SB filter if plotting is enabled
 
         # Parsing reference:
@@ -316,6 +315,7 @@ class HologramImage(Signal2D):
             # else:
             #     output_shape = (np.int(sb_size.data*2), np.int(sb_size.data*2))
             output_shape = self.axes_manager.signal_shape
+            output_shape = output_shape[::-1]
 
         # Logging the reconstruction parameters if appropriate:
         _logger.info('Sideband position in pixels: {}'.format(sb_position))
@@ -370,7 +370,8 @@ class HologramImage(Signal2D):
 
         wave_image = wave_object / wave_reference
 
-        wave_image.set_signal_type('electron_wave')  # New signal is a wave image!
+        # wave_image.set_signal_type('electron_wave')  # New signal is a wave image!
+        wave_image.set_signal_type('electron_wave')  # New signal is a complex
 
         wave_image.axes_manager.signal_axes[0].scale = self.sampling[0] * self.axes_manager.signal_shape[0] / \
                                                        output_shape[0]
