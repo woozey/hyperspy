@@ -26,6 +26,7 @@ import collections
 import tempfile
 import unicodedata
 from contextlib import contextmanager
+from scipy.ndimage import convolve
 
 import numpy as np
 
@@ -923,3 +924,48 @@ def transpose(*args, signal_axes=None, navigation_axes=None, optimize=False):
     return [sig.transpose(signal_axes=signal_axes,
                           navigation_axes=navigation_axes,
                           optimize=optimize) for sig in args]
+
+
+def laplacian2d(data):
+    """Calculates 2d laplacian of an 2d image
+
+    Parameters
+    ----------
+    data : ndarray, real
+        input 2d image
+
+    Returns
+    -------
+    laplacian : 2darray
+        laplacian of the image approximated with a stencil_kernel without diagonal elements
+
+    See Also
+    --------
+    ~.misc.holography.electric_fields.charge_density_map
+
+    """
+    stencil_kernel = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]])
+
+    return convolve(data, stencil_kernel)
+
+
+def laplacian2d_complex(complex_data):
+    """Calculates 2d laplacian of a complex 2d image
+
+    Parameters
+    ----------
+    complex_data : 2darray, complex
+        input 2d image
+
+    Returns
+    -------
+    laplacian : nparray
+        laplacian of the image approximated with a stencil_kernel without diagonal elements
+
+    See Also
+    --------
+    ~.misc.holography.electric_fields.charge_density_map
+
+    """
+
+    return np.complex128(laplacian2d(complex_data.real) + 1j * laplacian2d(complex_data.imag))

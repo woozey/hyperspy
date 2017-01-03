@@ -18,6 +18,9 @@
 
 import numpy as np
 from hyperspy.misc.holography.holo_constants import c_e
+from hyperspy.misc.utils import laplacian2d_complex
+import scipy.constants as constants
+
 
 def charge_density_map(wave, beam_energy):
     """
@@ -25,6 +28,8 @@ def charge_density_map(wave, beam_energy):
 
     Parameters
     ----------
+    wave : ndarray of complex
+        Electron wave image
     beam_energy : float
         Electron beam energy in keV
 
@@ -32,3 +37,9 @@ def charge_density_map(wave, beam_energy):
     -------
     Interaction constant in SI units as a float
     """
+
+    (gradient_x, gradient_y) = np.gradient(wave)
+    charge = - (constants.epsilon_0 / c_e(beam_energy) / constants.e) *\
+             np.imag(laplacian2d_complex(wave) / wave - (gradient_x ** 2 + gradient_y ** 2) / wave ** 2)
+
+    return charge
