@@ -39,7 +39,7 @@ def charge_density_map(wave, beam_energy):
     """
 
     (gradient_x, gradient_y) = np.gradient(wave)
-    charge = - (constants.epsilon_0 / c_e(beam_energy) / constants.e) *\
+    charge = - (constants.epsilon_0 / c_e(beam_energy) / constants.e) * \
              np.imag(laplacian2d_complex(wave) / wave - (gradient_x ** 2 + gradient_y ** 2) / wave ** 2)
 
     return charge
