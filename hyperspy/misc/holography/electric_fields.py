@@ -24,7 +24,10 @@ import scipy.constants as constants
 
 def charge_density_map(wave, beam_energy):
     """
-    Calculates charge density map from reconstructed wave using Laplacian operator
+    Calculates charge density map from reconstructed wave using numerical Laplacian operator. The method described in:
+    [Beleggia, M. et al.
+    Direct measurement of the charge distribution along a biased carbon nanotube bundle using electron holography.
+    Applied Physics Letters 98, 243101 (2011). http://dx.doi.org/10.1063/1.3598468]
 
     Parameters
     ----------
@@ -35,7 +38,7 @@ def charge_density_map(wave, beam_energy):
 
     Returns
     -------
-    Interaction constant in SI units as a float
+    Charge density in e/px
     """
 
     (gradient_x, gradient_y) = np.gradient(wave)

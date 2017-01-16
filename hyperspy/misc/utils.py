@@ -959,7 +959,7 @@ def laplacian2d_complex(complex_data):
 
     Returns
     -------
-    laplacian : nparray
+    laplacian : 2darray, complex
         laplacian of the image approximated with a stencil_kernel without diagonal elements
 
     See Also
