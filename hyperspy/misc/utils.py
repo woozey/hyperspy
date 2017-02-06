@@ -27,6 +27,7 @@ import tempfile
 import unicodedata
 from contextlib import contextmanager
 from scipy.ndimage import convolve
+from itertools import permutations
 
 import numpy as np
 
@@ -930,14 +931,16 @@ def transpose(*args, signal_axes=None, navigation_axes=None, optimize=False):
                           optimize=optimize) for sig in args]
 
 
-def laplacian2d(data):
+def laplacian2d(data, gamma=1./3.0):
     """Calculates 2d laplacian of an 2d image
 
     Parameters
     ----------
     data : ndarray, real
         input 2d image
-
+    gamma : float
+        Mixing parameters in convex combination of difference operators. Gamma = 1/3 gives the best approximation of
+        rotational symmetry. Gamma = 0 gives standard laplacian filter without diagonal elements.
     Returns
     -------
     laplacian : 2darray
@@ -948,9 +951,10 @@ def laplacian2d(data):
     ~.misc.holography.electric_fields.charge_density_map
 
     """
-    stencil_kernel = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]])
+    filter_kernel = (1. - gamma) * np.array([[0., 1., 0.], [1., -4., 1.], [0., 1., 0.]]) + \
+                    gamma * np.array([[0.5, 0.0, 0.5], [0.0, -2.0, 0.0], [0.5, 0.0, 0.5]])
 
-    return convolve(data, stencil_kernel)
+    return convolve(data, filter_kernel)
 
 
 def laplacian2d_complex(complex_data):
@@ -973,3 +977,137 @@ def laplacian2d_complex(complex_data):
     """
 
     return np.complex128(laplacian2d(complex_data.real) + 1j * laplacian2d(complex_data.imag))
+
+
+def laplacian2d_complex_with_mask_stencil(complex_data, mask):
+    """
+    Calculates laplacian 2D with binary mask regularisation. In particular only pixels inside mask are convolved with
+    the filter kernel without diagonal elements. The border pixels are treated with truncated laplacian kernels
+
+    Parameters
+    ----------
+    complex_data : 2darray, complex
+        input complex 2D image
+    mask : 2darray, binary
+        binary mask for regularisation
+
+    Returns
+    -------
+    laplacian : 2darray, complex
+        laplacian of the image regularised using a mask
+    """
+
+    # import matplotlib.pyplot as plt
+
+    # Create initial edge masks by shifting the mask
+    # plt.matshow(mask, origin='lower', interpolation='none')
+    mask_shifts = {'l': np.roll(mask, 1, axis=1),
+                   'r': np.roll(mask, -1, axis=1),
+                   'd': np.roll(mask, 1, axis=0),
+                   'u': np.roll(mask, -1, axis=0)}
+
+    single_keys = set(list(mask_shifts.keys()))
+    # print('single keys:', single_keys)
+
+    # Assign temporary single-key masks (these include double-key and triple-key in them)
+    masks = {}
+    for key in mask_shifts.keys():
+        masks[key] = np.logical_and(mask, np.logical_not(mask_shifts[key]))
+
+    # Creating a list of double-keys and triple-keys from permutations of single-keys
+    double_keys = set(''.join(sorted((k1, k2)))
+                      for k1, k2 in permutations(single_keys, r=2))
+    # print('double keys:', double_keys)
+    triple_keys = set(''.join(sorted((k1, k2, k3)))
+                      for k1, k2, k3 in permutations(single_keys, r=3))
+    # print('triple keys:', triple_keys)
+
+    # Filling triple- and temporary double-key masks (not double-key masks would include triple-key ones)
+    for key in double_keys:
+        masks[key] = np.logical_and(masks[key[0]], masks[key[1]])
+    for key in triple_keys:
+        masks[key] = np.logical_and(masks[key[:2]], masks[key[2]])
+
+    # mask_sum = np.sum([m for m in masks.values()], axis=0) + mask
+    # im = plt.matshow(mask_sum, origin='lower', interpolation='none', cmap='jet')
+    # plt.gcf().colorbar(im)
+
+    # Excluding triple-key masks from the others:
+    for tkey in triple_keys:
+        for key in masks.keys():
+            key_in_tkey = [k in tkey for k in key]
+            if np.all(key_in_tkey) and not key == tkey:
+                masks[key][masks[tkey]] = False
+
+    # Excluding double key masks from single-key ones
+    for dkey in double_keys:
+        for key in masks.keys():
+            if key in dkey and not key == dkey:
+                masks[key][masks[dkey]] = False
+
+    # for key in masks.keys():
+        # plt.matshow(masks[key], origin='lower', interpolation='none')
+        # plt.title(key)
+
+    mask_sum = np.sum([m for m in masks.values()], axis=0).astype('bool')
+    # im = plt.matshow(mask_sum + mask, origin='lower', interpolation='none', cmap='jet')
+    # plt.gcf().colorbar(im)
+
+    mask_inner = np.logical_xor(mask, mask_sum)
+
+    laplacian_real = laplacian2d(complex_data.real * mask_inner, gamma=0)
+    laplacian_imag = laplacian2d(complex_data.imag * mask_inner, gamma=0)
+
+    for key in masks.keys():
+        filter_kernel = np.array([[0., 1., 0.], [1., -4., 1.], [0., 1., 0.]])
+        for k in key:
+            filter_kernel += np.array([[0., 0., 0.], [0., 1., 0.], [0., -1., 0.]]) * (k == 'u') +\
+                             np.array([[0., -1., 0.], [0., 1., 0.], [0., 0., 0.]]) * (k == 'd') +\
+                             np.array([[0., 0., 0.], [-1., 1., 0.], [0., 0., 0.]]) * (k == 'l') +\
+                             np.array([[0., 0., 0.], [0., 1., -1.], [0., 0., 0.]]) * (k == 'r')
+        laplacian_real += convolve(complex_data.real * masks[key], filter_kernel)
+        laplacian_imag += convolve(complex_data.imag * masks[key], filter_kernel)
+
+    return np.complex128(laplacian_real + 1j * laplacian_imag)
+
+
+def laplacian2d_with_mask(data, mask, gamma=0):
+    """
+    Calculates laplacian 2D with binary mask regularisation. In particular only pixels inside mask are convolved with
+    the filter kernel with diagonal elements which weights defined by gamma. The border pixels are treated with
+    truncated laplacian kernels
+
+    Parameters
+    ----------
+    data : 2darray, float
+        input image
+    mask : 2darray, binary
+        binary mask for regularisation
+    gamma : float
+        Mixing parameters in convex combination of difference operators. Gamma = 1/3 gives the best approximation of
+        rotational symmetry. Gamma = 0 gives standard laplacian filter without diagonal elements.
+
+    Returns
+    -------
+    laplacian : 2darray, complex
+        laplacian of the image regularised using a mask
+    """
+
+    # import matplotlib.pyplot as plt
+    # plt.matshow(mask, origin='lower')
+    # plt.matshow(data * mask, origin='lower')
+    direction_matrix = np.array([[4, 0, 5], [1, 10, 2], [6, 3, 7]])
+    filter_kernel = (1. - gamma) * np.array([[0., 1., 0.], [1., -4., 1.], [0., 1., 0.]]) +\
+        gamma * np.array([[0.5, 0.0, 0.5], [0.0, -2.0, 0.0], [0.5, 0.0, 0.5]])
+
+    laplacian = convolve(data * mask, filter_kernel)
+
+    for direction in np.arange(8):
+        edge_filter = -(direction_matrix == direction).astype('float') +\
+                      np.array([[0., 0., 0.], [0., 1., 0.], [0., 0., 0.]])
+        edge_masks = convolve(mask.astype('float'), edge_filter) > 0
+        laplacian += convolve(data * edge_masks,
+                              (1. - gamma) * np.fliplr(np.flipud(edge_filter)) * (direction <= 3) + gamma / 2 *
+                              np.fliplr(np.flipud(edge_filter)) * (direction > 3))
+    # plt.matshow(laplacian, origin='lower')
+    return laplacian
