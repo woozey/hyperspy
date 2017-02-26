@@ -32,8 +32,10 @@ class TestCaseElectronWaveImage(object):
         self.img_sizey = 64
         c = 1e-6
         y, x = np.meshgrid(np.arange(self.img_sizey), np.arange(self.img_sizex))
-        charge_coordinates_x = np.round(np.random.rand(6) * 63)
-        charge_coordinates_y = np.round(np.random.rand(6) * 63)
+        charge_coordinates_x = np.round(np.random.rand(6) * (self.img_sizey-1)*0.6 + (self.img_sizey-1)*0.2)
+        charge_coordinates_y = np.round(np.random.rand(6) * (self.img_sizey-1)*0.6 + (self.img_sizey-1)*0.2)
+        radius = np.round(np.random.rand(6) * (self.img_sizey-1)*0.12 + 2.)
+
 
         # coordinates of mirror plane:
 
@@ -44,20 +46,54 @@ class TestCaseElectronWaveImage(object):
                           2 * a * b / (a ** 2 + b ** 2) * charge_coordinates_y + 2 * a
         charge_mirror_y = (a ** 2 - b ** 2) / (a ** 2 + b ** 2) * charge_coordinates_y - \
                           2 * a * b / (a ** 2 + b ** 2) * charge_coordinates_x + 2 * b
-        charge = np.int64(np.random.rand(6) * 10)
+        charge = np.int64(np.random.rand(6) * 100)
 
         self.phase = np.zeros((6, self.img_sizex, self.img_sizey))
         self.input_charge = np.zeros((6, self.img_sizex, self.img_sizey))
 
         for i in range(6):
-            self.phase[i, :, :] = - charge[i] * c_e(self.beam_energy) * constants.e / np.pi / 4 / constants.epsilon_0 \
-                                  * np.log(np.sqrt((x - charge_coordinates_x[i] + c) ** 2 +
-                                                   (y - charge_coordinates_y[i] + c) ** 2) /
-                                           np.sqrt(
-                                               (x - charge_mirror_x[i] + c) ** 2 + (y - charge_mirror_y[i] + c) ** 2))
+            r1 = np.sqrt((x - charge_coordinates_x[i]) ** 2 + (y - charge_coordinates_y[i]) ** 2)
+            r2 = np.sqrt((x - charge_mirror_x[i]) ** 2 + (y - charge_mirror_y[i]) ** 2)
 
-            self.input_charge[i, int(charge_coordinates_x[i]), int(charge_coordinates_y[i])] = charge[i]
-            self.input_charge[i, int(charge_mirror_x[i]), int(charge_mirror_y[i])] = - charge[i]
+            # The square height when  the path come across the sphere
+
+            z1 = radius[i] ** 2 - r1 ** 2
+
+            z2 = radius[i] ** 2 - r2 ** 2
+
+            # Phase calculation in 3 different cases:
+            # case 1: outside the spheres
+            case1 = ((z1 < 0) & (z2 < 0))
+            self.phase[i, case1] += - charge[i] * c_e(self.beam_energy) * constants.e / np.pi / 4 / constants.epsilon_0\
+                                    * np.log((r1[case1] ** 2) / (r2[case1] ** 2))
+
+            # case 2: inside the charge sphere
+            case2 = ((z1 >= 0) & (z2 <= 0))
+            z3 = np.sqrt(z1)
+            self.phase[i, case2] += charge[i] * c_e(self.beam_energy) * constants.e / np.pi / 4. / constants.epsilon_0 *\
+                                 (- np.log((z3[case2] + radius[i]) ** 2 / r2[case2] ** 2) +
+                                  (z3[case2] * (2 * radius[i] ** 2 + z3[case2] ** 2) -
+                                   z3[case2] ** 3 / 3.) / radius[i] ** 3)
+            self.input_charge[i, case2] = charge[i] / (4. / 3. * np.pi * radius[i] ** 3) *\
+                                          np.sqrt(radius[i] ** 2 - r1[case2])
+
+            # case 3 : inside the image charge sphere
+            case3 = np.logical_not(case1 | case2)
+            z4 = np.sqrt(z2)
+            self.phase[i, case3] += charge[i] * c_e(self.beam_energy) * constants.e / np.pi / 4 / constants.epsilon_0 *\
+                                 (np.log((z4[case3] + radius[i]) ** 2 / r1[case3] ** 2) -
+                                  (z4[case3] * (2 * radius[i] ** 2 + z4[case3] ** 2) -
+                                   z4[case3] ** 3 / 3) / radius[i] ** 3)
+
+        # for i in range(6):
+        #     self.phase[i, :, :] = - charge[i] * c_e(self.beam_energy) * constants.e / np.pi / 4 / constants.epsilon_0 \
+        #                           * np.log(np.sqrt((x - charge_coordinates_x[i] + c) ** 2 +
+        #                                            (y - charge_coordinates_y[i] + c) ** 2) /
+        #                                    np.sqrt(
+        #                                        (x - charge_mirror_x[i] + c) ** 2 + (y - charge_mirror_y[i] + c) ** 2))
+        #
+        #     self.input_charge[i, int(charge_coordinates_x[i]), int(charge_coordinates_y[i])] = charge[i]
+        #     self.input_charge[i, int(charge_mirror_x[i]), int(charge_mirror_y[i])] = - charge[i]
 
         self.wave_image = hs.signals.ElectronWaveImage(np.reshape(np.exp(1j * self.phase),
                                                                   (2, 3, self.img_sizex, self.img_sizey)))
@@ -87,9 +123,9 @@ class TestCaseElectronWaveImage(object):
 
         # 2. Testing charge density calculation without scale given:
 
-        charge_density = self.wave_image.charge_density_map()
-        charge_density_median = charge_density.map(median_filter, size=3, inplace=False)
-        charge_density_gauss = charge_density.map(gaussian_filter, sigma=0.61, inplace=False)
+        charge_density = self.wave_image.charge_density_map(gamma=1./3.)
+        # charge_density_median = charge_density.map(median_filter, size=3, inplace=False)
+        # charge_density_gauss = charge_density.map(gaussian_filter, sigma=0.61, inplace=False)
         charge_density_1 = wave_image_1.charge_density_map()
 
 if __name__ == '__main__':

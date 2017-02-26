@@ -22,7 +22,7 @@ from hyperspy.misc.utils import laplacian2d_complex
 import scipy.constants as constants
 
 
-def charge_density_map(wave, beam_energy):
+def charge_density_map(wave, beam_energy, gamma=0.):
     """
     Calculates charge density map from reconstructed wave using numerical Laplacian operator. The method described in:
     [Beleggia, M. et al.
@@ -43,6 +43,6 @@ def charge_density_map(wave, beam_energy):
 
     (gradient_x, gradient_y) = np.gradient(wave)
     charge = - (constants.epsilon_0 / c_e(beam_energy) / constants.e) * \
-             np.imag(laplacian2d_complex(wave) / wave - (gradient_x ** 2 + gradient_y ** 2) / wave ** 2)
+             np.imag(laplacian2d_complex(wave, gamma=gamma) / wave - (gradient_x ** 2 + gradient_y ** 2) / wave ** 2)
 
     return charge

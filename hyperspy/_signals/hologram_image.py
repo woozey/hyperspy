@@ -61,7 +61,8 @@ class HologramImage(Signal2D):
 
         Examples
         --------
-
+        >>> import hyperspy.api as hs
+        >>> s = hs.datasets.example_signals.object_hologram()
         >>> s.set_microscope_parameters(beam_energy=300.)
         >>> print('Now set to %s keV' %
         >>>       s.metadata.Acquisition_instrument.
@@ -207,9 +208,7 @@ class HologramImage(Signal2D):
         >>> s = hs.datasets.example_signals.object_hologram()
         >>> sb_position = s.estimate_sideband_position()
         >>> sb_size = s.estimate_sideband_size(sb_position)
-        >>> sb_size.data
         >>> wave = s.reconstruct_phase(sb_position=sb_position, sb_size=sb_size)
-
         """
 
         # TODO: Use defaults for choosing sideband, smoothness, relative filter size and output shape if not provided

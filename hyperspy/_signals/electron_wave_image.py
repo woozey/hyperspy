@@ -77,7 +77,7 @@ class ElectronWaveImage(ComplexSignal2D):
         if tilt_stage is not None:
             md.set_item("Acquisition_instrument.TEM.tilt_stage", tilt_stage)
 
-    def charge_density_map(self, show_progressbar=False):
+    def charge_density_map(self, gamma=0., show_progressbar=False):
         """
         Calculates charge density map using numerical Laplacian as described in [Beleggia, M. et al.
         Direct measurement of the charge distribution along a biased carbon nanotube bundle using electron holography.
@@ -85,6 +85,9 @@ class ElectronWaveImage(ComplexSignal2D):
 
         Parameters
         ----------
+        gamma : float
+            Mixing parameters in convex combination of difference operators. Gamma = 1/3 gives the best approximation of
+            rotational symmetry. Gamma = 0 gives standard laplacian filter without diagonal elements.
         show_progressbar : boolean
             Shows progressbar while iterating over different slices of the signal (passes the parameter to map method).
 
@@ -114,7 +117,8 @@ class ElectronWaveImage(ComplexSignal2D):
         else:
             new_units = "e/" + self.axes_manager.signal_axes[0].units + "^2"
 
-        charge_density = self.map(charge_density_map, beam_energy=ht, inplace=False, show_progressbar=show_progressbar)
+        charge_density = self.map(charge_density_map, beam_energy=ht, gamma=gamma, inplace=False,
+                                  show_progressbar=show_progressbar)
         charge_density.set_signal_type('signal2d')
 
         pixel_size = self.axes_manager.signal_axes[0].scale * self.axes_manager.signal_axes[1].scale
