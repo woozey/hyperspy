@@ -13,6 +13,7 @@ import hyperspy.api as hs
 
 
 matplotlib.rcParams['figure.max_open_warning'] = 25
+matplotlib.rcParams['interactive'] = False
 
 
 @pytest.fixture(autouse=True)
@@ -25,14 +26,6 @@ def add_np(doctest_namespace):
 def setup_module(mod):
     if pytest.config.getoption("--pdb"):
         import dask
-        dask.set_options(get=dask.async.get_sync)
+        dask.set_options(get=dask.local.get_sync)
 
-
-@pytest.fixture
-def mpl_cleanup():
-    from matplotlib.testing.decorators import _do_cleanup
-
-    original_units_registry = matplotlib.units.registry.copy()
-    original_settings = matplotlib.rcParams.copy()
-    yield
-    _do_cleanup(original_units_registry, original_settings)
+from matplotlib.testing.conftest import mpl_test_settings
