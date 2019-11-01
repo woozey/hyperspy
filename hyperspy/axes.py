@@ -165,7 +165,7 @@ class UnitConversion:
             units = self.units
             if units == t.Undefined:
                 units = ''
-            return self.__dict__[attribute] * _ureg(units)
+            return getattr(self, attribute) * _ureg(units)
         else:
             raise ValueError('`attribute` argument can only take the `scale` '
                              'or the `offset` value.')
@@ -183,10 +183,10 @@ class UnitConversion:
             if value.units != units and value.units != '' and units != '':
                 other = 'offset' if attribute == 'scale' else 'scale'
                 other_quantity = self._get_quantity(other).to(value.units)
-                self.__dict__[other] = float(other_quantity.magnitude)
+                setattr(self, other, float(other_quantity.magnitude))
 
             self.units = '{:~}'.format(value.units)
-            self.__dict__[attribute] = float(value.magnitude)
+            setattr(self, attribute, float(value.magnitude))
         else:
             raise ValueError('`attribute` argument can only take the `scale` '
                              'or the `offset` value.')
@@ -202,7 +202,7 @@ class UnitConversion:
         self._units = s
 
 
-@add_gui_method(toolkey="DataAxis")
+@add_gui_method(toolkey="hyperspy.DataAxis")
 class DataAxis(t.HasTraits, UnitConversion):
     name = t.Str()
     units = t.Str()
@@ -628,7 +628,7 @@ class DataAxis(t.HasTraits, UnitConversion):
         self._set_quantity(value, 'offset')
 
 
-@add_gui_method(toolkey="AxesManager")
+@add_gui_method(toolkey="hyperspy.AxesManager")
 class AxesManager(t.HasTraits):
 
     """Contains and manages the data axes.
@@ -1496,7 +1496,7 @@ class AxesManager(t.HasTraits):
 
     def gui_navigation_sliders(self, title="", display=True, toolkit=None):
         return get_gui(self=self.navigation_axes,
-                       toolkey="navigation_sliders",
+                       toolkey="hyperspy.navigation_sliders",
                        display=display,
                        toolkit=toolkit,
                        title=title)

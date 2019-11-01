@@ -84,3 +84,31 @@ def outer_nd(*vec):
     out : ndarray
     """
     return reduce(np.multiply.outer, vec)
+
+
+def hann_window_nth_order(m, order):
+    """
+    Calculates 1D Hann window of nth order
+
+    Parameter
+    ---------
+    m : int
+        number of points in window (typically the length of a signal)
+    order : int
+        Filter order
+
+    Return
+    ------
+    window : array
+        window
+    """
+    if not isinstance(m, int) or m <= 0:
+        raise ValueError('Parameter m has to be positive integer greater than 0.')
+    if not isinstance(order, int) or order <= 0:
+        raise ValueError('Filter order has to be positive integer greater than 0.')
+    sin_arg = np.pi * (m - 1.) / m
+    cos_arg = 2. * np.pi / (m - 1.) * (np.arange(m))
+
+    return m / (order * 2 * np.pi) * sum([(-1) ** i / i *
+                                          np.sin(i * sin_arg) * (np.cos(i * cos_arg) - 1)
+                                          for i in range(1, order + 1)])
